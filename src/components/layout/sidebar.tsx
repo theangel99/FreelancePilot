@@ -10,8 +10,10 @@ import {
   CheckSquare,
   Clock,
   FileText,
-  Settings
+  Settings,
+  Shield
 } from "lucide-react"
+import { useEffect, useState } from "react"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -25,11 +27,28 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const response = await fetch("/api/user/subscription")
+        if (response.ok) {
+          const data = await response.json()
+          setIsAdmin(data.role === "ADMIN")
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error)
+      }
+    }
+
+    checkAdminStatus()
+  }, [])
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-gray-50/40">
+    <div className="flex h-full w-64 flex-col border-r bg-card">
       <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" className="font-bold text-xl">
+        <Link href="/dashboard" className="font-bold text-xl bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
           FreelancePilot
         </Link>
       </div>
@@ -41,9 +60,9 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
@@ -52,6 +71,20 @@ export function Sidebar() {
             </Link>
           )
         })}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all border-t mt-4 pt-4",
+              pathname === "/admin"
+                ? "bg-purple-500 text-white shadow-sm"
+                : "text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 hover:text-purple-700 dark:hover:text-purple-300"
+            )}
+          >
+            <Shield className="h-5 w-5" />
+            Admin Panel
+          </Link>
+        )}
       </nav>
     </div>
   )

@@ -1,6 +1,7 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
+import { formatCurrency } from "./currency"
 
 type InvoiceData = {
   invoice: {
@@ -14,6 +15,7 @@ type InvoiceData = {
     tax: number
     taxRate: number
     discount: number
+    currency: string
     notes: string | null
     terms: string | null
     client: {
@@ -199,8 +201,8 @@ export function generateInvoicePDF(data: InvoiceData) {
   const tableData = invoice.items.map((item) => [
     item.description,
     item.quantity.toString(),
-    `$${item.unitPrice.toFixed(2)}`,
-    `$${item.amount.toFixed(2)}`,
+    formatCurrency(item.unitPrice, invoice.currency),
+    formatCurrency(item.amount, invoice.currency),
   ])
 
   autoTable(doc, {
@@ -236,20 +238,20 @@ export function generateInvoicePDF(data: InvoiceData) {
 
   doc.setFontSize(9)
   doc.text("Subtotal:", totalsX, totalsY)
-  doc.text(`$${invoice.subtotal.toFixed(2)}`, 200, totalsY, { align: "right" })
+  doc.text(formatCurrency(invoice.subtotal, invoice.currency), 200, totalsY, { align: "right" })
   totalsY += 6
 
   if (invoice.discount > 0) {
     doc.setTextColor(220, 38, 38)
     doc.text("Discount:", totalsX, totalsY)
-    doc.text(`-$${invoice.discount.toFixed(2)}`, 200, totalsY, { align: "right" })
+    doc.text(`-${formatCurrency(invoice.discount, invoice.currency)}`, 200, totalsY, { align: "right" })
     doc.setTextColor(0, 0, 0)
     totalsY += 6
   }
 
   if (invoice.taxRate > 0) {
     doc.text(`Tax (${invoice.taxRate}%):`, totalsX, totalsY)
-    doc.text(`$${invoice.tax.toFixed(2)}`, 200, totalsY, { align: "right" })
+    doc.text(formatCurrency(invoice.tax, invoice.currency), 200, totalsY, { align: "right" })
     totalsY += 6
   }
 
@@ -262,7 +264,7 @@ export function generateInvoicePDF(data: InvoiceData) {
   doc.setFontSize(12)
   doc.setFont("helvetica", "bold")
   doc.text("Total:", totalsX, totalsY)
-  doc.text(`$${invoice.total.toFixed(2)}`, 200, totalsY, { align: "right" })
+  doc.text(formatCurrency(invoice.total, invoice.currency), 200, totalsY, { align: "right" })
 
   // PAID stamp if applicable
   if (invoice.status === "PAID" && invoice.paidAt) {

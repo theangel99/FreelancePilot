@@ -7,9 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import Link from "next/link"
 import { downloadInvoicePDF } from "@/lib/pdf"
+import { formatCurrency } from "@/lib/currency"
 
 type InvoiceData = {
   invoice: {
@@ -24,6 +28,7 @@ type InvoiceData = {
     tax: number
     taxRate: number
     discount: number
+    currency: string
     notes: string | null
     terms: string | null
     client: {
@@ -68,6 +73,8 @@ export default function InvoiceDetailPage() {
   const router = useRouter()
   const [data, setData] = useState<InvoiceData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showPaidDialog, setShowPaidDialog] = useState(false)
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -91,7 +98,12 @@ export default function InvoiceDetailPage() {
     }
   }, [params.id, router])
 
-  const handleMarkAsPaid = async () => {
+  const handleMarkAsPaid = () => {
+    setPaidDate(new Date().toISOString().split('T')[0])
+    setShowPaidDialog(true)
+  }
+
+  const handleConfirmPaid = async () => {
     if (!data) return
 
     try {
@@ -100,13 +112,14 @@ export default function InvoiceDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "PAID",
-          paidAt: new Date().toISOString(),
+          paidAt: new Date(paidDate).toISOString(),
         }),
       })
 
       if (response.ok) {
         const updatedData = await response.json()
         setData({ ...data, invoice: updatedData })
+        setShowPaidDialog(false)
       }
     } catch (error) {
       console.error("Error updating invoice:", error)
@@ -175,9 +188,45 @@ export default function InvoiceDetailPage() {
   const { invoice, companySettings } = data
 
   return (
-    <div className="space-y-6 print:space-y-0">
-      {/* Actions Bar - Hidden when printing */}
-      <div className="flex justify-between items-center print:hidden">
+    <>
+      {/* Mark as Paid Dialog */}
+      <Dialog open={showPaidDialog} onOpenChange={setShowPaidDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Invoice as Paid</DialogTitle>
+            <DialogDescription>
+              Enter the date when this invoice was paid. This helps track your cash flow accurately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="paidDate">Paid Date</Label>
+              <Input
+                id="paidDate"
+                type="date"
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+              />
+              <p className="text-sm text-muted-foreground">
+                This date will be used for revenue tracking in your dashboard.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaidDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmPaid}>
+              Confirm Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="space-y-6 print:space-y-0">
+        {/* Actions Bar - Hidden when printing */}
+        <div className="flex justify-between items-center print:hidden">
         <Link href="/invoices">
           <Button variant="ghost">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -299,8 +348,8 @@ export default function InvoiceDetailPage() {
                   <tr key={item.id} className="border-b border-gray-200">
                     <td className="py-3">{item.description}</td>
                     <td className="text-right py-3">{item.quantity}</td>
-                    <td className="text-right py-3">${item.unitPrice.toFixed(2)}</td>
-                    <td className="text-right py-3">${item.amount.toFixed(2)}</td>
+                    <td className="text-right py-3">{formatCurrency(item.unitPrice, invoice.currency)}</td>
+                    <td className="text-right py-3">{formatCurrency(item.amount, invoice.currency)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -312,24 +361,24 @@ export default function InvoiceDetailPage() {
             <div className="w-64 space-y-2">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>${invoice.subtotal.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
               </div>
               {invoice.discount > 0 && (
                 <div className="flex justify-between text-red-600">
                   <span>Discount:</span>
-                  <span>-${invoice.discount.toFixed(2)}</span>
+                  <span>-{formatCurrency(invoice.discount, invoice.currency)}</span>
                 </div>
               )}
               {invoice.taxRate > 0 && (
                 <div className="flex justify-between">
                   <span>Tax ({invoice.taxRate}%):</span>
-                  <span>${invoice.tax.toFixed(2)}</span>
+                  <span>{formatCurrency(invoice.tax, invoice.currency)}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between text-xl font-bold">
                 <span>Total:</span>
-                <span>${invoice.total.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.total, invoice.currency)}</span>
               </div>
               {invoice.status === "PAID" && invoice.paidAt && (
                 <div className="text-center py-2 bg-green-50 text-green-700 font-semibold rounded">
@@ -368,6 +417,7 @@ export default function InvoiceDetailPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </>
   )
 }

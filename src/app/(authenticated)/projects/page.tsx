@@ -162,20 +162,10 @@ export default function ProjectsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {(() => {
-                          const openTasks = project.tasks?.filter((t: any) =>
-                            t.status !== "COMPLETED" && t.status !== "CANCELLED"
-                          ).length || 0
-                          const completedTasks = project.tasks?.filter((t: any) =>
-                            t.status === "COMPLETED"
-                          ).length || 0
-                          return (
-                            <div className="space-y-1">
-                              <div className="text-green-600">{completedTasks} done</div>
-                              <div className="text-blue-600">{openTasks} open</div>
-                            </div>
-                          )
-                        })()}
+                        <div>{project._count.tasks} task{project._count.tasks !== 1 ? "s" : ""}</div>
+                        <div className="text-muted-foreground text-xs">
+                          {project._count.timeEntries} time entr{project._count.timeEntries === 1 ? "y" : "ies"}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

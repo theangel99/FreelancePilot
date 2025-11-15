@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
@@ -17,21 +16,7 @@ const taskSchema = z.object({
 // GET /api/tasks - List all tasks
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
+    const { workspaceId } = await requireWorkspace()
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url)
@@ -40,7 +25,7 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get("priority")
 
     const where: any = {
-      workspaceId: workspaceMember.workspaceId,
+      workspaceId,
     }
 
     if (projectId) {
@@ -81,30 +66,15 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks - Create new task
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const { workspaceId } = await requireWorkspace()
     const body = await request.json()
     const validatedData = taskSchema.parse(body)
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
 
     // Verify project belongs to user's workspace
     const project = await prisma.project.findFirst({
       where: {
         id: validatedData.projectId,
-        workspaceId: workspaceMember.workspaceId,
+        workspaceId,
       },
     })
 
@@ -115,7 +85,7 @@ export async function POST(request: NextRequest) {
     const task = await prisma.task.create({
       data: {
         ...validatedData,
-        workspaceId: workspaceMember.workspaceId,
+        workspaceId,
         dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
       },
       include: {

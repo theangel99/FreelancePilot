@@ -122,17 +122,31 @@ export default function TasksPage() {
       const task = tasks.find(t => t.id === taskId)
       if (!task) return
 
+      // Build payload, filtering out null values
+      const payload: any = {
+        title: task.title,
+        projectId: task.project.id,
+        status: newStatus,
+        priority: task.priority,
+      }
+
+      if (task.description) payload.description = task.description
+      if (task.dueDate) payload.dueDate = task.dueDate
+      if (task.estimatedHours !== null && task.estimatedHours !== undefined) {
+        payload.estimatedHours = task.estimatedHours
+      }
+
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...task,
-          status: newStatus,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
         fetchTasks()
+      } else {
+        const error = await response.json()
+        console.error("Error updating task:", error)
       }
     } catch (error) {
       console.error("Error updating task:", error)
@@ -286,10 +300,8 @@ export default function TasksPage() {
                           value={task.status}
                           onValueChange={(value) => handleQuickStatusChange(task.id, value)}
                         >
-                          <SelectTrigger className="w-[130px] h-8">
-                            <Badge className={statusColors[task.status as keyof typeof statusColors]}>
-                              {task.status.replace("_", " ")}
-                            </Badge>
+                          <SelectTrigger className={`w-[130px] h-8 ${statusColors[task.status as keyof typeof statusColors]}`}>
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="TODO">To Do</SelectItem>

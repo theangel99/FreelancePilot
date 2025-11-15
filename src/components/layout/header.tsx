@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LogOut, User } from "lucide-react"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { SubscriptionBadge } from "@/components/ui/subscription-badge"
 
 export function Header() {
   const { data: session } = useSession()
@@ -27,11 +29,13 @@ export function Header() {
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
+    <header className="flex h-16 items-center justify-between border-b bg-background px-6">
       <div className="flex-1">
         {/* Search or breadcrumbs can go here */}
       </div>
       <div className="flex items-center gap-4">
+        <SubscriptionBadge />
+        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -50,7 +54,7 @@ export function Header() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <a href="/dashboard/settings" className="cursor-pointer">
+              <a href="/settings" className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 Settings
               </a>

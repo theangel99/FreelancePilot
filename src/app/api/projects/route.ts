@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
@@ -21,27 +20,20 @@ const projectSchema = z.object({
 // GET /api/projects - List all projects
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
+    const { workspaceId } = await requireWorkspace()
 
     const projects = await prisma.project.findMany({
-      where: { workspaceId: workspaceMember.workspaceId },
+      where: { workspaceId },
       include: {
-        client: true,
-        tasks: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            company: true,
+            status: true,
+          },
+        },
         _count: {
           select: {
             tasks: true,
@@ -62,29 +54,14 @@ export async function GET(request: NextRequest) {
 // POST /api/projects - Create new project
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const { workspaceId } = await requireWorkspace()
     const body = await request.json()
     const validatedData = projectSchema.parse(body)
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
 
     const project = await prisma.project.create({
       data: {
         ...validatedData,
-        workspaceId: workspaceMember.workspaceId,
+        workspaceId,
         startDate: validatedData.startDate ? new Date(validatedData.startDate) : null,
         endDate: validatedData.endDate ? new Date(validatedData.endDate) : null,
       },

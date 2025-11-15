@@ -27,25 +27,25 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 11%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 14%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 47% 14%;
     --popover-foreground: 210 40% 98%;
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 217.2 32.6% 20%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 217.2 32.6% 17%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 217.2 32.6% 18%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 217.2 32.6% 20%;
+    --input: 217.2 32.6% 17%;
+    --ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -63,6 +63,8 @@
   /* Hide navigation and UI elements */
   aside,
   header,
+  nav,
+  footer,
   .print\\:hidden {
     display: none !important;
   }
@@ -83,13 +85,16 @@
     margin: 0 !important;
     overflow: visible !important;
     background: white !important;
+    width: 100% !important;
   }
 
   /* Reset body for printing */
-  body {
+  html, body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
   }
 
   /* Ensure invoice card has no shadow or border on print */
@@ -98,22 +103,35 @@
     border: none !important;
     border-radius: 0 !important;
     max-width: 100% !important;
+    width: 100% !important;
     margin: 0 !important;
+    background: white !important;
   }
 
   .invoice-print-container > div {
-    padding: 0.5cm !important;
+    padding: 1.5cm 2cm !important;
   }
 
   /* Page setup */
   @page {
-    size: A4;
-    margin: 1.5cm;
+    size: A4 portrait;
+    margin: 0;
   }
 
   /* Prevent page breaks inside important sections */
-  table, .invoice-section {
+  table, .invoice-section, thead, tbody, tr {
     page-break-inside: avoid;
+  }
+
+  /* Better table styling for print */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 8px;
   }
 
   /* Ensure proper text colors for print */
@@ -121,5 +139,29 @@
     color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Ensure black text for readability */
+  body, p, span, div, td, th {
+    color: #000 !important;
+  }
+
+  /* Keep background colors for badges and highlights */
+  .bg-green-100, .bg-blue-100, .bg-red-100, .bg-gray-100, .bg-green-50 {
+    background-color: transparent !important;
+    border: 1px solid #000 !important;
+    padding: 2px 8px !important;
+  }
+
+  /* Remove unnecessary spacing */
+  .space-y-6 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* Ensure separators are visible */
+  hr, .separator {
+    border-color: #000 !important;
+    opacity: 0.3 !important;
   }
 }

@@ -1,4 +1,4 @@
-"use client"
+ "use client"
 
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Plus, Trash2, Clock } from "lucide-react"
 import { format } from "date-fns"
+import { CURRENCIES, getCurrencySymbol } from "@/lib/currency"
 
 type InvoiceItem = {
   description: string
@@ -30,6 +31,7 @@ type InvoiceDialogProps = {
 export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: InvoiceDialogProps) {
   const [clients, setClients] = useState<any[]>([])
   const [unbilledTime, setUnbilledTime] = useState<any[]>([])
+  const [defaultCurrency, setDefaultCurrency] = useState("EUR")
   const [formData, setFormData] = useState({
     clientId: preselectedClient || "",
     issueDate: new Date().toISOString().split('T')[0],
@@ -38,6 +40,7 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
     terms: "",
     taxRate: 0,
     discount: 0,
+    currency: "EUR",
   })
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: "", quantity: 1, unitPrice: 0, amount: 0 },
@@ -47,7 +50,7 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
   const [showTimeImport, setShowTimeImport] = useState(false)
 
   useEffect(() => {
-    // Fetch clients
+    // Fetch clients and company settings
     const fetchClients = async () => {
       try {
         const response = await fetch("/api/clients")
@@ -59,7 +62,24 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
         console.error("Error fetching clients:", error)
       }
     }
+
+    const fetchCompanySettings = async () => {
+      try {
+        const response = await fetch("/api/settings/company")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.defaultCurrency) {
+            setDefaultCurrency(data.defaultCurrency)
+            setFormData(prev => ({ ...prev, currency: data.defaultCurrency }))
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching company settings:", error)
+      }
+    }
+
     fetchClients()
+    fetchCompanySettings()
   }, [])
 
   useEffect(() => {
@@ -90,6 +110,7 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
         terms: invoice.terms || "",
         taxRate: invoice.taxRate || 0,
         discount: invoice.discount || 0,
+        currency: invoice.currency || defaultCurrency,
       })
       if (invoice.items) {
         setItems(invoice.items.map((item: any) => ({
@@ -110,10 +131,11 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
         terms: "Payment is due within 30 days",
         taxRate: 0,
         discount: 0,
+        currency: defaultCurrency,
       })
       setItems([{ description: "", quantity: 1, unitPrice: 0, amount: 0 }])
     }
-  }, [invoice, preselectedClient, open])
+  }, [invoice, preselectedClient, open, defaultCurrency])
 
   const addItem = () => {
     setItems([...items, { description: "", quantity: 1, unitPrice: 0, amount: 0 }])
@@ -184,7 +206,17 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
 
       if (!response.ok) {
         const data = await response.json()
-        setError(data.error || "Something went wrong")
+        console.error("Invoice creation error:", data)
+
+        // Show detailed validation errors
+        if (data.details && Array.isArray(data.details)) {
+          const errorMessages = data.details.map((err: any) =>
+            `${err.path.join('.')}: ${err.message}`
+          ).join(', ')
+          setError(`Validation error: ${errorMessages}`)
+        } else {
+          setError(data.error || "Something went wrong")
+        }
         return
       }
 
@@ -214,7 +246,7 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
           )}
 
           {/* Client and Dates */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="clientId">Client *</Label>
               <Select value={formData.clientId} onValueChange={(value) => setFormData({ ...formData, clientId: value })}>
@@ -225,6 +257,22 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name} {client.company && `(${client.company})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency *</Label>
+              <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px]">
+                  {CURRENCIES.map((currency) => (
+                    <SelectItem key={currency.code} value={currency.code}>
+                      {currency.code} ({currency.symbol}) - {currency.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -358,7 +406,7 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="discount">Discount ($)</Label>
+                <Label htmlFor="discount">Discount ({getCurrencySymbol(formData.currency)})</Label>
                 <Input
                   id="discount"
                   type="number"
@@ -369,27 +417,27 @@ export function InvoiceDialog({ open, onClose, invoice, preselectedClient }: Inv
               </div>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-md space-y-2">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Subtotal:</span>
-                <span>${calculateSubtotal().toFixed(2)}</span>
+                <span>{getCurrencySymbol(formData.currency)}{calculateSubtotal().toFixed(2)}</span>
               </div>
               {formData.discount > 0 && (
-                <div className="flex justify-between text-sm text-red-600">
+                <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
                   <span>Discount:</span>
-                  <span>-${formData.discount.toFixed(2)}</span>
+                  <span>-{getCurrencySymbol(formData.currency)}{formData.discount.toFixed(2)}</span>
                 </div>
               )}
               {formData.taxRate > 0 && (
                 <div className="flex justify-between text-sm">
                   <span>Tax ({formData.taxRate}%):</span>
-                  <span>${calculateTax().toFixed(2)}</span>
+                  <span>{getCurrencySymbol(formData.currency)}{calculateTax().toFixed(2)}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total:</span>
-                <span>${calculateTotal().toFixed(2)}</span>
+                <span>{getCurrencySymbol(formData.currency)}{calculateTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>

@@ -17,6 +17,7 @@ const companySettingsSchema = z.object({
   taxId: z.string().optional(),
   invoicePrefix: z.string().min(1, "Invoice prefix is required"),
   defaultTaxRate: z.number().min(0).max(100).optional(),
+  defaultCurrency: z.string().min(1, "Default currency is required"),
   defaultTerms: z.string().optional(),
 })
 
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
           invoicePrefix: "INV",
           nextInvoiceNumber: 1,
           defaultTaxRate: 0,
+          defaultCurrency: "EUR",
           defaultTerms: "Payment is due within 30 days",
         },
       })
@@ -108,6 +110,7 @@ export async function PUT(request: NextRequest) {
           taxId: validatedData.taxId || null,
           invoicePrefix: validatedData.invoicePrefix,
           defaultTaxRate: validatedData.defaultTaxRate || 0,
+          defaultCurrency: validatedData.defaultCurrency,
           defaultTerms: validatedData.defaultTerms || null,
         },
       })
@@ -129,6 +132,7 @@ export async function PUT(request: NextRequest) {
           invoicePrefix: validatedData.invoicePrefix,
           nextInvoiceNumber: 1,
           defaultTaxRate: validatedData.defaultTaxRate || 0,
+          defaultCurrency: validatedData.defaultCurrency,
           defaultTerms: validatedData.defaultTerms || null,
         },
       })

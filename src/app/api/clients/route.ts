@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
@@ -37,24 +36,10 @@ const clientSchema = z.object({
 // GET /api/clients - List all clients
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
+    const { workspaceId } = await requireWorkspace()
 
     const clients = await prisma.client.findMany({
-      where: { workspaceId: workspaceMember.workspaceId },
+      where: { workspaceId },
       orderBy: { createdAt: "desc" },
     })
 
@@ -68,30 +53,15 @@ export async function GET(request: NextRequest) {
 // POST /api/clients - Create new client
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const { workspaceId } = await requireWorkspace()
     const body = await request.json()
     console.log("Received body:", JSON.stringify(body, null, 2))
     const validatedData = clientSchema.parse(body)
 
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
-
     const client = await prisma.client.create({
       data: {
         ...validatedData,
-        workspaceId: workspaceMember.workspaceId,
+        workspaceId,
         email: validatedData.email || null,
         firstContactDate: validatedData.firstContactDate ? new Date(validatedData.firstContactDate) : null,
         lastContactDate: validatedData.lastContactDate ? new Date(validatedData.lastContactDate) : null,

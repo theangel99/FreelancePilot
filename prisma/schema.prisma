@@ -15,6 +15,12 @@ datasource db {
 // AUTHENTICATION (NextAuth.js compatible)
 // ============================================
 
+enum UserRole {
+  ADMIN
+  PRO
+  FREE_TRIAL
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -22,6 +28,34 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+
+  // Subscription & Role
+  role              UserRole  @default(FREE_TRIAL)
+  trialEndsAt       DateTime?
+  subscriptionEndsAt DateTime?
+  stripeCustomerId  String?   @unique
+  stripeSubscriptionId String? @unique
+
+  // User Preferences
+  preferredCurrency String    @default("EUR") // User's preferred currency for viewing stats
+
+  // Professional Info
+  jobTitle          String?
+  bio               String?
+  defaultHourlyRate Float?
+
+  // Contact Information
+  phone             String?
+  website           String?
+  linkedinUrl       String?
+  twitterUrl        String?
+
+  // Location
+  address           String?
+  city              String?
+  country           String?
+  timezone          String?   @default("UTC")
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -233,6 +267,7 @@ model Project {
 
   @@index([workspaceId])
   @@index([clientId])
+  @@index([status])
   @@map("projects")
 }
 
@@ -312,6 +347,8 @@ model TimeEntry {
   @@index([projectId])
   @@index([taskId])
   @@index([startTime])
+  @@index([endTime])
+  @@index([invoiced, billable, endTime])
   @@map("time_entries")
 }
 
@@ -340,6 +377,7 @@ model Invoice {
   taxRate         Float         @default(0) // Tax rate as percentage
   discount        Float         @default(0)
   total           Float         @default(0)
+  currency        String        @default("EUR") // Currency code (EUR, USD, GBP, etc.)
   notes           String?
   terms           String?
   paidAt          DateTime?
@@ -399,6 +437,7 @@ model CompanySettings {
   logo            String?
   taxId           String?
   defaultTaxRate  Float    @default(0)
+  defaultCurrency String   @default("EUR") // Default currency for invoices
   defaultTerms    String?
   defaultNotes    String?
   invoicePrefix   String   @default("INV")

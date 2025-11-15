@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
@@ -9,8 +8,8 @@ const invoiceItemSchema = z.object({
   quantity: z.number().positive(),
   unitPrice: z.number(),
   amount: z.number(),
-  projectId: z.string().optional(),
-  taskId: z.string().optional(),
+  projectId: z.string().optional().nullable(),
+  taskId: z.string().optional().nullable(),
 })
 
 const invoiceSchema = z.object({
@@ -22,29 +21,31 @@ const invoiceSchema = z.object({
   terms: z.string().optional(),
   taxRate: z.number().optional(),
   discount: z.number().optional(),
+  currency: z.string().min(1, "Currency is required"),
 })
 
 // GET /api/invoices - List all invoices
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const { workspaceId } = await requireWorkspace()
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
+    // First, automatically update overdue invoices
+    const now = new Date()
+    await prisma.invoice.updateMany({
+      where: {
+        workspaceId,
+        status: "SENT",
+        dueDate: {
+          lt: now,
+        },
+      },
+      data: {
+        status: "OVERDUE",
+      },
     })
 
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
-
     const invoices = await prisma.invoice.findMany({
-      where: { workspaceId: workspaceMember.workspaceId },
+      where: { workspaceId },
       include: {
         client: true,
         items: true,
@@ -68,36 +69,28 @@ export async function GET(request: NextRequest) {
 // POST /api/invoices - Create new invoice
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const { workspaceId, userId } = await requireWorkspace()
     const body = await request.json()
+    console.log("Invoice creation request body:", JSON.stringify(body, null, 2))
     const validatedData = invoiceSchema.parse(body)
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
 
     // Get or create company settings to generate invoice number
     let companySettings = await prisma.companySettings.findUnique({
-      where: { workspaceId: workspaceMember.workspaceId },
+      where: { workspaceId },
     })
 
     if (!companySettings) {
+      // Get workspace name for default settings
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { name: true },
+      })
+
       // Create default company settings
       companySettings = await prisma.companySettings.create({
         data: {
-          workspaceId: workspaceMember.workspaceId,
-          companyName: workspaceMember.workspace.name,
+          workspaceId,
+          companyName: workspace?.name || "My Company",
           invoicePrefix: "INV",
           nextInvoiceNumber: 1,
         },
@@ -114,12 +107,22 @@ export async function POST(request: NextRequest) {
     const tax = (subtotal - discount) * (taxRate / 100)
     const total = subtotal - discount + tax
 
+    // Clean up items - convert null to undefined for optional fields
+    const cleanedItems = validatedData.items.map((item) => ({
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount: item.amount,
+      ...(item.projectId && { projectId: item.projectId }),
+      ...(item.taskId && { taskId: item.taskId }),
+    }))
+
     // Create invoice with items
     const invoice = await prisma.invoice.create({
       data: {
-        workspaceId: workspaceMember.workspaceId,
+        workspaceId,
         clientId: validatedData.clientId,
-        createdById: session.user.id,
+        createdById: userId,
         invoiceNumber,
         issueDate: new Date(validatedData.issueDate),
         dueDate: new Date(validatedData.dueDate),
@@ -128,11 +131,12 @@ export async function POST(request: NextRequest) {
         taxRate,
         discount,
         total,
+        currency: validatedData.currency,
         notes: validatedData.notes,
         terms: validatedData.terms || companySettings.defaultTerms,
         status: "DRAFT",
         items: {
-          create: validatedData.items,
+          create: cleanedItems,
         },
       },
       include: {
@@ -143,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Update next invoice number
     await prisma.companySettings.update({
-      where: { workspaceId: workspaceMember.workspaceId },
+      where: { workspaceId },
       data: { nextInvoiceNumber: companySettings.nextInvoiceNumber + 1 },
     })
 

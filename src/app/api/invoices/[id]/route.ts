@@ -22,6 +22,7 @@ const invoiceUpdateSchema = z.object({
   terms: z.string().optional(),
   taxRate: z.number().optional(),
   discount: z.number().optional(),
+  currency: z.string().optional(),
   paidAt: z.string().optional(),
 })
 
@@ -44,6 +45,21 @@ export async function GET(
     if (!workspaceMember) {
       return NextResponse.json({ error: "No workspace found" }, { status: 404 })
     }
+
+    // First, automatically update overdue invoices
+    const now = new Date()
+    await prisma.invoice.updateMany({
+      where: {
+        workspaceId: workspaceMember.workspaceId,
+        status: "SENT",
+        dueDate: {
+          lt: now,
+        },
+      },
+      data: {
+        status: "OVERDUE",
+      },
+    })
 
     const invoice = await prisma.invoice.findFirst({
       where: {
@@ -129,6 +145,7 @@ export async function PUT(
     if (validatedData.dueDate) updateData.dueDate = new Date(validatedData.dueDate)
     if (validatedData.notes !== undefined) updateData.notes = validatedData.notes
     if (validatedData.terms !== undefined) updateData.terms = validatedData.terms
+    if (validatedData.currency) updateData.currency = validatedData.currency
     if (validatedData.paidAt) updateData.paidAt = new Date(validatedData.paidAt)
 
     // If items are updated, recalculate totals
@@ -144,13 +161,23 @@ export async function PUT(
       const tax = (subtotal - discount) * (taxRate / 100)
       const total = subtotal - discount + tax
 
+      // Clean up items - convert null to undefined for optional fields
+      const cleanedItems = validatedData.items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        amount: item.amount,
+        ...(item.projectId && { projectId: item.projectId }),
+        ...(item.taskId && { taskId: item.taskId }),
+      }))
+
       updateData.subtotal = subtotal
       updateData.tax = tax
       updateData.taxRate = taxRate
       updateData.discount = discount
       updateData.total = total
       updateData.items = {
-        create: validatedData.items,
+        create: cleanedItems,
       }
     }
 

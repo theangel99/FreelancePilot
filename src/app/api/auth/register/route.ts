@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { getTrialEndDate } from "@/lib/subscription"
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -32,12 +33,14 @@ export async function POST(request: NextRequest) {
 
     // Create user and workspace in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create user
+      // Create user with 30-day trial
       const user = await tx.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
+          role: "FREE_TRIAL",
+          trialEndsAt: getTrialEndDate(),
         },
       })
 

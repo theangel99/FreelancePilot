@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { requireWorkspace } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
@@ -18,21 +17,7 @@ const timeEntrySchema = z.object({
 // GET /api/time-entries - List all time entries
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
+    const { workspaceId, userId } = await requireWorkspace()
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url)
@@ -43,8 +28,8 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get("clientId") // Filter by client
 
     const where: any = {
-      workspaceId: workspaceMember.workspaceId,
-      userId: session.user.id,
+      workspaceId,
+      userId,
     }
 
     if (projectId) {
@@ -94,54 +79,50 @@ export async function GET(request: NextRequest) {
 // POST /api/time-entries - Create new time entry
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const { workspaceId, userId } = await requireWorkspace()
     const body = await request.json()
     const validatedData = timeEntrySchema.parse(body)
 
-    // Get user's first workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
-      where: { userId: session.user.id },
-      include: { workspace: true },
-    })
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: "No workspace found" }, { status: 404 })
-    }
-
     // If starting a new timer, stop any existing active timers
     if (!validatedData.endTime) {
+      // Get active timers to calculate their durations
       const activeTimers = await prisma.timeEntry.findMany({
         where: {
-          workspaceId: workspaceMember.workspaceId,
-          userId: session.user.id,
+          workspaceId,
+          userId,
           endTime: null,
+        },
+        select: {
+          id: true,
+          startTime: true,
         },
       })
 
-      // Stop all active timers
-      for (const timer of activeTimers) {
+      // Stop all active timers in a single transaction
+      if (activeTimers.length > 0) {
         const now = new Date()
-        const duration = Math.floor((now.getTime() - new Date(timer.startTime).getTime()) / 1000)
-        await prisma.timeEntry.update({
-          where: { id: timer.id },
-          data: {
-            endTime: now,
-            duration,
-          },
-        })
+
+        // Update each timer individually to calculate correct duration
+        await prisma.$transaction(
+          activeTimers.map((timer) => {
+            const duration = Math.floor((now.getTime() - new Date(timer.startTime).getTime()) / 1000)
+            return prisma.timeEntry.update({
+              where: { id: timer.id },
+              data: {
+                endTime: now,
+                duration,
+              },
+            })
+          })
+        )
       }
     }
 
     const timeEntry = await prisma.timeEntry.create({
       data: {
         ...validatedData,
-        workspaceId: workspaceMember.workspaceId,
-        userId: session.user.id,
+        workspaceId,
+        userId,
         startTime: new Date(validatedData.startTime),
         endTime: validatedData.endTime ? new Date(validatedData.endTime) : null,
       },
