@@ -39,6 +39,10 @@ model User {
   // User Preferences
   preferredCurrency String    @default("EUR") // User's preferred currency for viewing stats
 
+  // Onboarding
+  onboardingCompleted Boolean   @default(false)
+  onboardingStep      Int       @default(0)
+
   // Professional Info
   jobTitle          String?
   bio               String?

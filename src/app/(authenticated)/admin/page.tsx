@@ -320,7 +320,7 @@ export default function AdminPage() {
         </CardContent>
       </Card>
 
-      {/* Add Days Dialog */}
+            {/* Add Days Dialog */}
       <Dialog open={showTrialDialog} onOpenChange={setShowTrialDialog}>
         <DialogContent>
           <DialogHeader>

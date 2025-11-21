@@ -9,6 +9,8 @@ import { Users, FolderKanban, CheckSquare, DollarSign, TrendingUp, TrendingDown,
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { format } from "date-fns"
 import { formatCurrency } from "@/lib/currency"
+import { FeatureTooltip } from "@/components/onboarding/feature-tooltip"
+import { WelcomeBanner } from "@/components/onboarding/welcome-banner"
 
 type DashboardStats = {
   totalClients: number
@@ -90,11 +92,20 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <FeatureTooltip
+            content="Your dashboard shows real-time analytics of your freelance business, including revenue, projects, and time tracking."
+            side="right"
+          />
+        </div>
         <p className="text-muted-foreground">
           Welcome back! Here's an overview of your freelance business.
         </p>
       </div>
+
+      {/* Welcome Banner for New Users */}
+      <WelcomeBanner />
 
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -167,8 +178,16 @@ export default function DashboardPage() {
         {/* Revenue Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Trend</CardTitle>
-            <CardDescription>Last 6 months revenue from paid invoices (in {stats.userCurrency})</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Revenue Trend</CardTitle>
+                <CardDescription>Last 6 months revenue from paid invoices (in {stats.userCurrency})</CardDescription>
+              </div>
+              <FeatureTooltip
+                content="Track your revenue over time. This chart shows income from invoices marked as 'Paid'."
+                side="left"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -195,8 +214,16 @@ export default function DashboardPage() {
         {/* Project Status Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Projects by Status</CardTitle>
-            <CardDescription>Distribution of your projects</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Projects by Status</CardTitle>
+                <CardDescription>Distribution of your projects</CardDescription>
+              </div>
+              <FeatureTooltip
+                content="See how your projects are distributed across different statuses: Planning, Active, On Hold, Completed, or Cancelled."
+                side="left"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
